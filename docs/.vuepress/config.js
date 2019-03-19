@@ -1,3 +1,61 @@
+const fs = require("fs");
+const path = require("path");
+
+const coursePath = "docs/courses/";
+
+const courseCodes = fs
+  .readdirSync(coursePath)
+  .filter(filename =>
+    fs.lstatSync(path.join(coursePath, filename)).isDirectory()
+  );
+
+const coursesItems = courseCodes.map(code => ({
+  text: `${code}`,
+  link: `/courses/${code}/`
+}));
+
+const childrenIn = (path, parentFolder) => {
+  try {
+    return fs
+      .readdirSync(`${path}${parentFolder}`)
+      .map(file =>
+        file.toLowerCase() === "readme.md"
+          ? parentFolder
+          : `${parentFolder}${file}`
+      )
+      .sort();
+  } catch (error) {}
+};
+
+var customSidebar = {};
+courseCodes.forEach(code => {
+  const courseFolder = `/courses/${code}/`;
+  const courseFolders = [
+    { title: "Lectures", path: "lectures/" },
+    { title: "Assignments", path: "assignments/" },
+    { title: "Labs", path: "labs/" },
+    { title: "Study", path: "notes/" },
+    { title: "Resources", path: "resources/" }
+  ];
+  customSidebar[courseFolder] =
+    fs
+      .readdirSync(coursePath + code)
+      .map(filename => filename.toLowerCase())
+      .indexOf("readme.md") >= 0
+      ? [""]
+      : [];
+  courseFolders.forEach(item =>
+    customSidebar[courseFolder].push({
+      title: item.title,
+      children: childrenIn(`${coursePath}${code}/`, item.path)
+    })
+  );
+});
+customSidebar["/"] = [
+  "",
+  { title: "Courses", children: courseCodes.map(code => `courses/${code}/`) }
+];
+
 module.exports = {
   title: "Tommy Deng Notes",
   description: "Notes by Tommy Deng.",
@@ -14,24 +72,14 @@ module.exports = {
     nav: [
       {
         text: "Courses",
-        items: [
-          { text: "CSI3131", link: "/CSI3131/" },
-          { text: "SEG3103", link: "/SEG3103/" },
-          { text: "SEG3125", link: "/SEG3125/" }
-        ]
+        items: coursesItems
       },
       { text: "GitHub", link: "https://github.com/sttic" }
     ],
-    sidebar: {
-      "/CSI3131/": ["", { title: "Lectures", children: [] }],
-      "/SEG3103/": ["", { title: "Lectures", children: [] }],
-      "/SEG3125/": ["", { title: "Lectures", children: [] }],
-      "/": [""]
-    }
+    sidebar: customSidebar
   },
 
   markdown: {
-    anchor: { permalink: false },
     config: md => {
       md.use(require("markdown-it-katex"));
     }

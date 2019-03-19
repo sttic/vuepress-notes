@@ -9,6 +9,10 @@ Hello, I am Tommy. These are my notes on various topics which includes universit
 
 ## Courses
 
-- [CSI3131 - Operating Systems](/CSI3131/)
-- [SEG3103 - Quality Assurance](/SEG3103/)
-- [SEG3125 - User Interfaces](/SEG3125/)
+Courses from the University of Ottawa.
+
+<ul>
+  <li v-for="item in $site.themeConfig.nav.filter(element => element.text === 'Courses')[0].items">
+    <router-link :to="item.link">{{ item.text }}</router-link>
+  </li>
+</ul>
