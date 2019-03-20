@@ -81,6 +81,7 @@ module.exports = {
 
   markdown: {
     config: md => {
+      md.use(require("markdown-it-container"), "center");
       md.use(require("markdown-it-katex"));
     }
   }

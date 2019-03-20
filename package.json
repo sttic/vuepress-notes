@@ -9,6 +9,7 @@
     "webpack-dev-middleware": "3.6.0"
   },
   "dependencies": {
+    "markdown-it-container": "^2.0.0",
     "markdown-it-katex": "^2.0.3"
   }
 }
