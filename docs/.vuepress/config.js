@@ -19,7 +19,7 @@ const childrenIn = (path, parentFolder) => {
     return fs
       .readdirSync(`${path}${parentFolder}`)
       .map(file =>
-        file.toLowerCase() === "readme.md"
+        ["readme.md", "index.md"].includes(file.toLowerCase())
           ? parentFolder
           : `${parentFolder}${file}`
       )
@@ -37,13 +37,15 @@ courseCodes.forEach(code => {
     { title: "Study", path: "notes/" },
     { title: "Resources", path: "resources/" }
   ];
-  customSidebar[courseFolder] =
-    fs
-      .readdirSync(coursePath + code)
-      .map(filename => filename.toLowerCase())
-      .indexOf("readme.md") >= 0
-      ? [""]
-      : [];
+  customSidebar[courseFolder] = fs
+    .readdirSync(coursePath + code)
+    .filter(fileOrDir =>
+      fs.lstatSync(path.join(coursePath + code, fileOrDir)).isFile()
+    )
+    .map(filename => filename.toLowerCase())
+    .some(file => ["readme.md", "index.md"].includes(file))
+    ? [""]
+    : [];
   courseFolders.forEach(item =>
     customSidebar[courseFolder].push({
       title: item.title,
