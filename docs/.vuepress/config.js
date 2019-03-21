@@ -2,6 +2,35 @@ const fs = require("fs");
 const path = require("path");
 
 const coursePath = "docs/courses/";
+const indexPages = ["readme.md", "index.md"];
+const sidebarGroups = [
+  { title: "Lectures", path: "lectures/" },
+  { title: "Assignments", path: "assignments/" },
+  { title: "Labs", path: "labs/" },
+  { title: "Study", path: "notes/" },
+  { title: "Resources", path: "resources/" }
+];
+
+function childrenIn(pathTo, parentFolder) {
+  try {
+    const folderPath = `${pathTo}${parentFolder}`;
+    const children = fs
+      .readdirSync(folderPath)
+      .filter(fileOrDir =>
+        fs.lstatSync(path.join(folderPath, fileOrDir)).isFile()
+      )
+      .filter(filename => path.extname(filename) === ".md")
+      .map(filename =>
+        indexPages.includes(filename.toLowerCase())
+          ? parentFolder
+          : `${parentFolder}${filename}`
+      )
+      .sort();
+    return children.length > 1 && children[0] === children[1]
+      ? children.splice(1)
+      : children;
+  } catch (error) {}
+}
 
 const courseCodes = fs
   .readdirSync(coursePath)
@@ -14,48 +43,28 @@ const coursesItems = courseCodes.map(code => ({
   link: `/courses/${code}/`
 }));
 
-const childrenIn = (path, parentFolder) => {
-  try {
-    return fs
-      .readdirSync(`${path}${parentFolder}`)
-      .map(file =>
-        ["readme.md", "index.md"].includes(file.toLowerCase())
-          ? parentFolder
-          : `${parentFolder}${file}`
-      )
-      .sort();
-  } catch (error) {}
-};
-
 var customSidebar = {};
 courseCodes.forEach(code => {
   const courseFolder = `/courses/${code}/`;
-  const courseFolders = [
-    { title: "Lectures", path: "lectures/" },
-    { title: "Assignments", path: "assignments/" },
-    { title: "Labs", path: "labs/" },
-    { title: "Study", path: "notes/" },
-    { title: "Resources", path: "resources/" }
-  ];
+  const pathToCourse = path.join(coursePath, code);
   customSidebar[courseFolder] = fs
-    .readdirSync(coursePath + code)
+    .readdirSync(pathToCourse)
     .filter(fileOrDir =>
-      fs.lstatSync(path.join(coursePath + code, fileOrDir)).isFile()
+      fs.lstatSync(path.join(pathToCourse, fileOrDir)).isFile()
     )
-    .map(filename => filename.toLowerCase())
-    .some(file => ["readme.md", "index.md"].includes(file))
+    .some(filename => indexPages.includes(filename.toLowerCase()))
     ? [""]
     : [];
-  courseFolders.forEach(item =>
+  sidebarGroups.forEach(group =>
     customSidebar[courseFolder].push({
-      title: item.title,
-      children: childrenIn(`${coursePath}${code}/`, item.path)
+      title: group.title,
+      children: childrenIn(`${pathToCourse}/`, group.path)
     })
   );
 });
 customSidebar["/"] = [
   "",
-  { title: "Courses", children: courseCodes.map(code => `courses/${code}/`) }
+  { title: "Courses", children: courseCodes.map(code => `/courses/${code}/`) }
 ];
 
 module.exports = {
