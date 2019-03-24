@@ -1,71 +1,91 @@
 const fs = require("fs");
 const path = require("path");
 
-const getFileTree = (dir, limit = Infinity, depth = 0) => {
-  dir = path.join(dir).replace(/\\/g, "/");
-  const isFile = fs.lstatSync(dir).isFile();
-  return {
-    dir,
-    depth,
-    isFile,
-    children:
-      isFile || depth >= limit
-        ? null
-        : fs
-            .readdirSync(dir)
-            .map(d => getFileTree(path.join(dir, d), limit, depth + 1))
-  };
-};
+const ignoreStartList = [".", "_"];
+const getFileTree = (dir, limit = Infinity, depth = 0) =>
+  ((dir, isFile) =>
+    Object.assign(path.parse(dir), {
+      fullPath: dir,
+      depth,
+      isFile,
+      children:
+        isFile || depth >= limit
+          ? null
+          : fs
+              .readdirSync(dir)
+              .filter(name => !ignoreStartList.includes(name[0]))
+              .map(name => getFileTree(path.join(dir, name), limit, depth + 1))
+    }))(path.join(dir).replace(/\\/g, "/"), fs.lstatSync(dir).isFile());
 
-const courseFolderPath = "docs/courses";
+const vuepressRoot = "docs";
+const vuepressTree = getFileTree(vuepressRoot, 4);
 const indexPages = ["readme.md", "index.md"];
-const courseFolderTree = getFileTree(courseFolderPath, 3);
-
-const coursesItems = [];
 const customSidebar = {};
-courseFolderTree.children
-  .filter(course => !course.isFile)
-  .map(course => {
-    const coursePath = `/${course.dir.replace("docs/", "")}/`;
-    coursesItems.push({
-      text: path.basename(course.dir),
-      link: `/${course.dir.replace("docs/", "")}/`
+const customNav = [];
+
+const sections = vuepressTree.children.filter(dir => !dir.isFile);
+
+sections.forEach(section => {
+  const navItems = [];
+  const subsections = section.children.filter(dir => !dir.isFile);
+  subsections.forEach(subsection => {
+    const subsectionPath = `/${subsection.fullPath.replace(
+      `${vuepressRoot}/`,
+      ""
+    )}/`;
+
+    navItems.push({
+      text: subsection.base,
+      link: subsectionPath
     });
-    customSidebar[coursePath] = course.children
-      .filter(child => child.isFile)
-      .some(child =>
-        indexPages.includes(path.basename(child.dir).toLowerCase())
-      )
+
+    const folderFiles = subsection.children.filter(dir => dir.isFile);
+    customSidebar[subsectionPath] = folderFiles.some(child =>
+      indexPages.includes(child.name.toLowerCase())
+    )
       ? [""]
       : [];
 
-    course.children
-      .filter(child => !child.isFile)
-      .forEach(child => {
-        const courseComponent = path.basename(child.dir);
-        var children = child.children
-          .filter(child => child.isFile && path.extname(child.dir) === ".md")
-          .map(child => {
-            const filename = path.basename(child.dir);
-            return indexPages.includes(filename.toLowerCase())
-              ? `${courseComponent}/`
-              : `${courseComponent}/${filename}`;
-          })
-          .sort();
-        children =
-          children.length > 1 && children[0] === children[1]
-            ? children.splice(1)
-            : children;
-        customSidebar[coursePath].push({
-          title: courseComponent,
-          children
-        });
+    const baseSections = subsection.children.filter(dir => !dir.isFile);
+    baseSections.forEach(baseSection => {
+      const baseSectionName = baseSection.name;
+
+      var baseFiles = baseSection.children
+        .filter(dir => dir.isFile && dir.ext === ".md")
+        .map(child =>
+          indexPages.includes(child.name.toLowerCase())
+            ? `${baseSectionName}/`
+            : `${baseSectionName}/${child.name}`
+        )
+        .sort();
+
+      baseFiles =
+        baseFiles.length > 1 && baseFiles[0] === baseFiles[1]
+          ? baseFiles.splice(1)
+          : baseFiles;
+
+      customSidebar[subsectionPath].push({
+        title: baseSectionName,
+        children: baseFiles
       });
+    });
   });
-customSidebar["/"] = [
-  "",
-  { title: "Courses", children: coursesItems.map(item => item.link) }
-];
+
+  if (navItems.length !== 0)
+    customNav.push({ text: section.name, items: navItems });
+});
+
+customNav.push({ text: "GitHub", link: "https://github.com/sttic" });
+
+customSidebar["/"] = [""];
+sections.forEach(section => {
+  customSidebar["/"].push({
+    title: section.name,
+    children: section.children
+      .filter(dir => !dir.isFile)
+      .map(subsection => `/${section.base}/${subsection.base}/`)
+  });
+});
 
 module.exports = {
   title: "Tommy Deng Notes",
@@ -81,13 +101,7 @@ module.exports = {
     ]
   ],
   themeConfig: {
-    nav: [
-      {
-        text: "Courses",
-        items: coursesItems
-      },
-      { text: "GitHub", link: "https://github.com/sttic" }
-    ],
+    nav: customNav,
     sidebar: customSidebar
   },
 
