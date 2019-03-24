@@ -13,8 +13,8 @@ const getFileTree = (dir, limit = Infinity, depth = 0) =>
           ? null
           : fs
               .readdirSync(dir)
-              .filter(name => !ignoreStartList.includes(name[0]))
-              .map(name => getFileTree(path.join(dir, name), limit, depth + 1))
+              .filter(base => !ignoreStartList.includes(base[0]))
+              .map(base => getFileTree(path.join(dir, base), limit, depth + 1))
     }))(path.join(dir).replace(/\\/g, "/"), fs.lstatSync(dir).isFile());
 
 const vuepressRoot = "docs";
@@ -39,30 +39,35 @@ sections.forEach(section => {
       link: subsectionPath
     });
 
-    const folderFiles = subsection.children.filter(dir => dir.isFile);
-    customSidebar[subsectionPath] = folderFiles.some(child =>
-      indexPages.includes(child.name.toLowerCase())
-    )
-      ? [""]
-      : [];
+    const folderFiles = subsection.children.filter(
+      dir => dir.isFile && dir.ext === ".md"
+    );
+    customSidebar[subsectionPath] = [
+      ...new Set(
+        folderFiles
+          .map(file =>
+            indexPages.includes(file.base.toLowerCase()) ? "" : file.base
+          )
+          .sort()
+      )
+    ];
 
     const baseSections = subsection.children.filter(dir => !dir.isFile);
     baseSections.forEach(baseSection => {
       const baseSectionName = baseSection.name;
 
-      var baseFiles = baseSection.children
-        .filter(dir => dir.isFile && dir.ext === ".md")
-        .map(file =>
-          indexPages.includes(file.base.toLowerCase())
-            ? `${baseSectionName}/`
-            : `${baseSectionName}/${file.name}`
+      var baseFiles = [
+        ...new Set(
+          baseSection.children
+            .filter(dir => dir.isFile && dir.ext === ".md")
+            .map(file =>
+              indexPages.includes(file.base.toLowerCase())
+                ? `${baseSectionName}/`
+                : `${baseSectionName}/${file.name}`
+            )
+            .sort()
         )
-        .sort();
-
-      baseFiles =
-        baseFiles.length > 1 && baseFiles[0] === baseFiles[1]
-          ? baseFiles.splice(1)
-          : baseFiles;
+      ];
 
       customSidebar[subsectionPath].push({
         title: baseSectionName,
@@ -77,15 +82,31 @@ sections.forEach(section => {
 
 customNav.push({ text: "GitHub", link: "https://github.com/sttic" });
 
-customSidebar["/"] = [""];
-sections.forEach(section => {
-  customSidebar["/"].push({
+customSidebar["/"] = [
+  ...[
+    ...new Set(
+      vuepressTree.children
+        .filter(dir => dir.isFile && dir.ext === ".md")
+        .map(file =>
+          indexPages.includes(file.base.toLowerCase()) ? "" : file.base
+        )
+        .sort()
+    )
+  ],
+  ...sections.map(section => ({
     title: section.name,
     children: section.children
-      .filter(dir => !dir.isFile)
-      .map(subsection => `/${section.base}/${subsection.base}/`)
-  });
-});
+      .filter(
+        dir =>
+          dir.isFile ||
+          (!dir.isFile &&
+            dir.children
+              .map(child => child.base)
+              .some(base => indexPages.includes(base.toLowerCase())))
+      )
+      .map(dir => `/${section.base}/${dir.base}${dir.isFile ? "" : "/"}`)
+  }))
+];
 
 module.exports = {
   title: "Tommy Deng Notes",
