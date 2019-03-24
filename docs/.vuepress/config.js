@@ -52,10 +52,10 @@ sections.forEach(section => {
 
       var baseFiles = baseSection.children
         .filter(dir => dir.isFile && dir.ext === ".md")
-        .map(child =>
-          indexPages.includes(child.name.toLowerCase())
+        .map(file =>
+          indexPages.includes(file.base.toLowerCase())
             ? `${baseSectionName}/`
-            : `${baseSectionName}/${child.name}`
+            : `${baseSectionName}/${file.name}`
         )
         .sort();
 
