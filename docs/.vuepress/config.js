@@ -2,111 +2,108 @@ const fs = require("fs");
 const path = require("path");
 
 const ignoreStartList = [".", "_"];
+const validFileExtList = [".md"];
 const getFileTree = (dir, limit = Infinity, depth = 0) =>
-  ((dir, isFile) =>
+  ((dir, lstat) =>
     Object.assign(path.parse(dir), {
       fullPath: dir,
       depth,
-      isFile,
+      isDirectory: lstat.isDirectory(),
+      isFile: lstat.isFile(),
       children:
-        isFile || depth >= limit
+        lstat.isFile() || depth >= limit
           ? null
           : fs
               .readdirSync(dir)
-              .filter(base => !ignoreStartList.includes(base[0]))
+              .filter(
+                base =>
+                  !ignoreStartList.includes(base[0]) &&
+                  (lstat =>
+                    lstat.isDirectory() ||
+                    (lstat.isFile() &&
+                      validFileExtList.includes(path.extname(base))))(
+                    fs.lstatSync(path.join(dir, base))
+                  )
+              )
               .map(base => getFileTree(path.join(dir, base), limit, depth + 1))
-    }))(path.join(dir).replace(/\\/g, "/"), fs.lstatSync(dir).isFile());
+    }))(path.join(dir).replace(/\\/g, "/"), fs.lstatSync(dir));
+
+const removeDuplicates = arr => [...new Set(arr)];
+
+const containsIndexFile = routeTree =>
+  routeTree.children
+    .map(child => child.base)
+    .some(base => indexPages.includes(base.toLowerCase()));
+
+const caseInsensitiveCompare = (a, b) =>
+  a.localeCompare(b, "en", { sensitivity: "base" });
+
+const sidebarFiles = routeTree =>
+  removeDuplicates(
+    routeTree.children
+      .filter(dir => dir.isFile)
+      .map(file =>
+        indexPages.includes(file.base.toLowerCase()) ? "" : file.base
+      )
+  ).sort(caseInsensitiveCompare);
+
+const sidebarGroups = routeTree =>
+  removeDuplicates(
+    routeTree.children
+      .filter(dir => dir.isDirectory)
+      .map(folder => ({
+        title: folder.name,
+        children: removeDuplicates(
+          folder.children
+            .filter(
+              dir => dir.isFile || (dir.isDirectory && containsIndexFile(dir))
+            )
+            .map(
+              dir =>
+                `${folder.base}/${
+                  indexPages.includes(dir.base.toLowerCase()) ? "" : dir.base
+                }${dir.isFile ? "" : "/"}`
+            )
+        ).sort(caseInsensitiveCompare)
+      }))
+  );
+
+const createSidebar = routeTree => {
+  return [...sidebarFiles(routeTree), ...sidebarGroups(routeTree)];
+};
 
 const vuepressRoot = "docs";
-const vuepressTree = getFileTree(vuepressRoot, 4);
 const indexPages = ["readme.md", "index.md"];
+const vuepressTree = getFileTree(vuepressRoot, 4);
 const customSidebar = {};
 const customNav = [];
 
-const sections = vuepressTree.children.filter(dir => !dir.isFile);
-
+const sections = vuepressTree.children.filter(dir => dir.isDirectory);
 sections.forEach(section => {
   const navItems = [];
-  const subsections = section.children.filter(dir => !dir.isFile);
-  subsections.forEach(subsection => {
-    const subsectionPath = `/${subsection.fullPath.replace(
-      `${vuepressRoot}/`,
-      ""
-    )}/`;
+  section.children
+    .filter(dir => dir.isDirectory)
+    .forEach(subsection => {
+      const subsectionPath = `${subsection.fullPath.replace(
+        vuepressRoot,
+        ""
+      )}/`;
+      customSidebar[subsectionPath] = createSidebar(subsection);
 
-    navItems.push({
-      text: subsection.base,
-      link: subsectionPath
+      if (containsIndexFile(subsection))
+        navItems.push({
+          text: subsection.base,
+          link: subsectionPath
+        });
     });
 
-    const folderFiles = subsection.children.filter(
-      dir => dir.isFile && dir.ext === ".md"
-    );
-    customSidebar[subsectionPath] = [
-      ...new Set(
-        folderFiles
-          .map(file =>
-            indexPages.includes(file.base.toLowerCase()) ? "" : file.base
-          )
-          .sort()
-      )
-    ];
-
-    const baseSections = subsection.children.filter(dir => !dir.isFile);
-    baseSections.forEach(baseSection => {
-      const baseSectionName = baseSection.name;
-
-      var baseFiles = [
-        ...new Set(
-          baseSection.children
-            .filter(dir => dir.isFile && dir.ext === ".md")
-            .map(file =>
-              indexPages.includes(file.base.toLowerCase())
-                ? `${baseSectionName}/`
-                : `${baseSectionName}/${file.name}`
-            )
-            .sort()
-        )
-      ];
-
-      customSidebar[subsectionPath].push({
-        title: baseSectionName,
-        children: baseFiles
-      });
-    });
-  });
-
-  if (navItems.length !== 0)
+  if (navItems.length !== 0) {
     customNav.push({ text: section.name, items: navItems });
+  }
 });
 
+customSidebar["/"] = createSidebar(vuepressTree);
 customNav.push({ text: "GitHub", link: "https://github.com/sttic" });
-
-customSidebar["/"] = [
-  ...[
-    ...new Set(
-      vuepressTree.children
-        .filter(dir => dir.isFile && dir.ext === ".md")
-        .map(file =>
-          indexPages.includes(file.base.toLowerCase()) ? "" : file.base
-        )
-        .sort()
-    )
-  ],
-  ...sections.map(section => ({
-    title: section.name,
-    children: section.children
-      .filter(
-        dir =>
-          dir.isFile ||
-          (!dir.isFile &&
-            dir.children
-              .map(child => child.base)
-              .some(base => indexPages.includes(base.toLowerCase())))
-      )
-      .map(dir => `/${section.base}/${dir.base}${dir.isFile ? "" : "/"}`)
-  }))
-];
 
 module.exports = {
   title: "Tommy Deng Notes",
