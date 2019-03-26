@@ -1,8 +1,11 @@
 const fs = require("fs");
 const path = require("path");
 
+const vuepressRoot = "docs";
+const indexPages = ["readme.md", "index.md"];
 const ignoreStartList = [".", "_"];
 const validFileExtList = [".md"];
+
 const getFileTree = (dir, limit = Infinity, depth = 0) =>
   ((dir, lstat) =>
     Object.assign(path.parse(dir), {
@@ -10,22 +13,23 @@ const getFileTree = (dir, limit = Infinity, depth = 0) =>
       depth,
       isDirectory: lstat.isDirectory(),
       isFile: lstat.isFile(),
-      children:
-        lstat.isFile() || depth >= limit
-          ? null
-          : fs
-              .readdirSync(dir)
-              .filter(
-                base =>
-                  !ignoreStartList.includes(base[0]) &&
-                  (lstat =>
-                    lstat.isDirectory() ||
-                    (lstat.isFile() &&
-                      validFileExtList.includes(path.extname(base))))(
-                    fs.lstatSync(path.join(dir, base))
-                  )
-              )
-              .map(base => getFileTree(path.join(dir, base), limit, depth + 1))
+      children: lstat.isFile()
+        ? null
+        : depth >= limit
+        ? []
+        : fs
+            .readdirSync(dir)
+            .filter(
+              base =>
+                !ignoreStartList.includes(base[0]) &&
+                (lstat =>
+                  lstat.isDirectory() ||
+                  (lstat.isFile() &&
+                    validFileExtList.includes(path.extname(base))))(
+                  fs.lstatSync(path.join(dir, base))
+                )
+            )
+            .map(base => getFileTree(path.join(dir, base), limit, depth + 1))
     }))(path.join(dir).replace(/\\/g, "/"), fs.lstatSync(dir));
 
 const removeDuplicates = arr => [...new Set(arr)];
@@ -72,11 +76,26 @@ const createSidebar = routeTree => {
   return [...sidebarFiles(routeTree), ...sidebarGroups(routeTree)];
 };
 
-const vuepressRoot = "docs";
-const indexPages = ["readme.md", "index.md"];
-const vuepressTree = getFileTree(vuepressRoot, 4);
+const parseRootPath = routeTree =>
+  `${routeTree.fullPath.replace(vuepressRoot, "")}/`;
+
+const recurseSidebar = (sidebar, routeTree) => {
+  sidebar[parseRootPath(routeTree)] = createSidebar(routeTree);
+  routeTree.children
+    .filter(dir => dir.isDirectory)
+    .map(route => recurseSidebar(sidebar, route));
+};
+
+const vuepressTree = getFileTree(vuepressRoot);
 const customSidebar = {};
 const customNav = [];
+
+const tempSidebar = {};
+recurseSidebar(tempSidebar, vuepressTree);
+const reverseSidebarKeys = Object.keys(tempSidebar).reverse();
+reverseSidebarKeys.forEach(
+  route => (customSidebar[route] = tempSidebar[route])
+);
 
 const sections = vuepressTree.children.filter(dir => dir.isDirectory);
 sections.forEach(section => {
@@ -84,12 +103,7 @@ sections.forEach(section => {
   section.children
     .filter(dir => dir.isDirectory)
     .forEach(subsection => {
-      const subsectionPath = `${subsection.fullPath.replace(
-        vuepressRoot,
-        ""
-      )}/`;
-      customSidebar[subsectionPath] = createSidebar(subsection);
-
+      const subsectionPath = parseRootPath(subsection);
       if (containsIndexFile(subsection))
         navItems.push({
           text: subsection.base,
@@ -102,7 +116,6 @@ sections.forEach(section => {
   }
 });
 
-customSidebar["/"] = createSidebar(vuepressTree);
 customNav.push({ text: "GitHub", link: "https://github.com/sttic" });
 
 module.exports = {
