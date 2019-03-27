@@ -80,22 +80,17 @@ const parseRootPath = routeTree =>
   `${routeTree.fullPath.replace(vuepressRoot, "")}/`;
 
 const recurseSidebar = (sidebar, routeTree) => {
-  sidebar[parseRootPath(routeTree)] = createSidebar(routeTree);
   routeTree.children
     .filter(dir => dir.isDirectory)
     .map(route => recurseSidebar(sidebar, route));
+  sidebar[parseRootPath(routeTree)] = createSidebar(routeTree);
 };
 
 const vuepressTree = getFileTree(vuepressRoot);
 const customSidebar = {};
 const customNav = [];
 
-const tempSidebar = {};
-recurseSidebar(tempSidebar, vuepressTree);
-const reverseSidebarKeys = Object.keys(tempSidebar).reverse();
-reverseSidebarKeys.forEach(
-  route => (customSidebar[route] = tempSidebar[route])
-);
+recurseSidebar(customSidebar, vuepressTree);
 
 const sections = vuepressTree.children.filter(dir => dir.isDirectory);
 sections.forEach(section => {
