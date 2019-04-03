@@ -6,31 +6,30 @@ const indexPages = ["readme.md", "index.md"];
 const ignoreStartList = [".", "_"];
 const validFileExtList = [".md"];
 
-const getFileTree = (dir, limit = Infinity, depth = 0) =>
-  ((dir, lstat) =>
-    Object.assign(path.parse(dir), {
-      fullPath: dir,
-      depth,
-      isDirectory: lstat.isDirectory(),
-      isFile: lstat.isFile(),
-      children: lstat.isFile()
-        ? null
-        : depth >= limit
-        ? []
-        : fs
-            .readdirSync(dir)
-            .filter(
-              base =>
-                !ignoreStartList.includes(base[0]) &&
-                (lstat =>
-                  lstat.isDirectory() ||
-                  (lstat.isFile() &&
-                    validFileExtList.includes(path.extname(base))))(
-                  fs.lstatSync(path.join(dir, base))
-                )
-            )
-            .map(base => getFileTree(path.join(dir, base), limit, depth + 1))
-    }))(path.join(dir).replace(/\\/g, "/"), fs.lstatSync(dir));
+const getFileTree = (dir, limit = Infinity, depth = 0) => {
+  const dirFSlash = path.join(dir).replace(/\\/g, "/");
+  const lstat = fs.lstatSync(dir);
+  return Object.assign(path.parse(dirFSlash), {
+    fullPath: dirFSlash,
+    depth,
+    isDirectory: lstat.isDirectory(),
+    isFile: lstat.isFile(),
+    children: lstat.isFile()
+      ? null
+      : depth >= limit
+      ? []
+      : fs
+          .readdirSync(dir)
+          .filter(base => {
+            const lstat = fs.lstatSync(path.join(dir, base));
+            return (
+              (!ignoreStartList.includes(base[0]) && lstat.isDirectory()) ||
+              (lstat.isFile() && validFileExtList.includes(path.extname(base)))
+            );
+          })
+          .map(base => getFileTree(path.join(dir, base), limit, depth + 1))
+  });
+};
 
 const removeDuplicates = arr => [...new Set(arr)];
 
@@ -111,7 +110,10 @@ sections.forEach(section => {
   }
 });
 
-customNav.push({ text: "GitHub", link: "https://github.com/sttic" });
+customNav.push({
+  text: "GitHub",
+  link: "https://github.com/sttic/vuepress-notes"
+});
 
 exports.customNav = customNav;
 exports.customSidebar = customSidebar;
