@@ -14,6 +14,8 @@ module.exports = {
     ]
   ],
   themeConfig: {
+    repo: "sttic/vuepress-notes",
+    sidebarDepth: 0,
     nav: navigator.customNav,
     sidebar: navigator.customSidebar
   },

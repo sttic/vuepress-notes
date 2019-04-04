@@ -110,10 +110,5 @@ sections.forEach(section => {
   }
 });
 
-customNav.push({
-  text: "GitHub",
-  link: "https://github.com/sttic/vuepress-notes"
-});
-
 exports.customNav = customNav;
 exports.customSidebar = customSidebar;
